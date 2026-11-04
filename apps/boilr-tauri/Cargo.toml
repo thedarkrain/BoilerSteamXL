@@ -4,7 +4,7 @@
 
 [package]
 name = "boilersteamxl"
-version = "1.0.0"
+version = "1.0.1"
 description = "BoilerSteamXL: discover, review and safely import non-Steam games (based on BoilR)"
 edition = "2021"
 

@@ -1,6 +1,6 @@
 # Changelog
 
-## BoilerSteamXL 1.0.0 (2026-11-04)
+## BoilerSteamXL 1.0.1 (2026-11-04)
 
 First release of the fork, based on BoilR `main` at `1b03ebf` (2.0 beta Tauri app).
 
@@ -21,6 +21,12 @@ First release of the fork, based on BoilR `main` at `1b03ebf` (2.0 beta Tauri ap
   in Steam twice, or maybe already there, opens a merge window (keep one, use mine, keep both).
 * Navigation cut to My Games and Settings; the rest sits under "More tools".
 * Artwork match picker shows cover thumbnails; the game window is smaller and folds rare options.
+* Benchmark against BoilR's own folder scanner (`tools/compare`, [docs/BENCHMARK.md](docs/BENCHMARK.md)).
+  Fixed what it found: mod tools such as Creation Kit are no longer picked as the game, the
+  default scan depth is 8 folders (like BoilR), and dotted initials stay one word
+  ("S.T.A.L.K.E.R.").
+* Artwork matching prefers the game with the same name, Roman numerals included
+  ("Baldur's Gate III" for "Baldur's Gate 3"), over SteamGridDB's most popular result.
 * Folder-based title resolution for repack and machine-style folder names.
 * Explainable executable scoring with "Uncertain" detection ([docs/SCORING.md](docs/SCORING.md)).
 * Exclusion Rules screen: rule types, context-aware rules, allowlist, preview, import/export,

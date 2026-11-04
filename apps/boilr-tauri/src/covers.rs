@@ -293,7 +293,11 @@ pub async fn fetch_artwork<R: tauri::Runtime>(app: tauri::AppHandle<R>, ids: Opt
             Some((id, name)) => Some((id, name)),
             // `.ok()` first: the error type is not Send and must not live across the sleep below.
             None => match client.search(&title).await.ok() {
-                Some(results) => results.into_iter().next().map(|r| (r.id, Some(r.name))),
+                // SteamGridDB ranks by popularity ("Halo" → "Halo: Spartan Assault"): the exact name wins.
+                Some(results) => {
+                    let exact = results.iter().position(|r| bsxl_engine::same_title(&r.name, &title));
+                    results.into_iter().nth(exact.unwrap_or(0)).map(|r| (r.id, Some(r.name)))
+                }
                 None => {
                     summary.failed += 1;
                     search_failures += 1;

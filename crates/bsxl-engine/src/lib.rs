@@ -56,6 +56,33 @@ pub fn norm_name(name: &str) -> String {
         .collect()
 }
 
+/// Two game titles name the same game when they differ only in case, punctuation, spacing or
+/// Roman against Arabic numerals: "Baldur's Gate III" and "Baldur's Gate 3", "Hades II" and
+/// "Hades 2". ("X" is left alone: "Mega Man X" is not "Mega Man 10".)
+pub fn same_title(a: &str, b: &str) -> bool {
+    let key = |s: &str| -> String {
+        s.split(|c: char| !c.is_alphanumeric())
+            .filter(|t| !t.is_empty())
+            .map(|t| {
+                let t = t.to_lowercase();
+                let n = match t.as_str() {
+                    "ii" => "2",
+                    "iii" => "3",
+                    "iv" => "4",
+                    "v" => "5",
+                    "vi" => "6",
+                    "vii" => "7",
+                    "viii" => "8",
+                    "ix" => "9",
+                    _ => return t,
+                };
+                n.to_string()
+            })
+            .collect()
+    };
+    key(a) == key(b)
+}
+
 /// Stable 64-bit FNV-1a, used for shortcut identity tags and plan tokens. Not for security.
 pub fn fnv64(data: &str) -> u64 {
     fnv64_bytes(data.as_bytes())
@@ -194,5 +221,16 @@ mod tests {
     fn normalizes_names_with_unicode() {
         assert_eq!(norm_name("A Way Out"), "awayout");
         assert_eq!(norm_name("Ōkami HD"), "ōkamihd");
+    }
+
+    #[test]
+    fn titles_match_across_roman_numerals_and_punctuation() {
+        assert!(same_title("Baldur's Gate 3", "Baldur's Gate III"));
+        assert!(same_title("Hades II", "Hades 2"));
+        assert!(same_title("Grand Theft Auto V", "grand theft auto 5"));
+        assert!(same_title("ELDEN RING NIGHTREIGN", "Elden Ring Nightreign"));
+        assert!(!same_title("Halo", "Halo: Spartan Assault"));
+        assert!(!same_title("Baldur's Gate 3", "Baldur's Gate 3 Toolkit"));
+        assert!(!same_title("Mega Man X", "Mega Man 10"));
     }
 }

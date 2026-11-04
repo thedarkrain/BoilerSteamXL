@@ -24,7 +24,7 @@ use crate::{
     title::{is_container_name, is_generic_exe, title_from_folder},
 };
 
-pub const DEFAULT_MAX_DEPTH: usize = 6;
+pub const DEFAULT_MAX_DEPTH: usize = 8;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ScanRoot {
@@ -745,7 +745,7 @@ fn score_group(game_dir: &Path, folder_name: &str, exes: &[&Exe]) -> (String, St
             if norm.contains("server") || norm.contains("dedicated") {
                 add(-15, "looks like a server".into());
             }
-            if ["editor", "sdk", "modtool", "devkit", "worldbuilder"].iter().any(|w| norm.contains(w)) {
+            if ["editor", "sdk", "modtool", "devkit", "worldbuilder", "creationkit", "toolkit", "modmanager"].iter().any(|w| norm.contains(w)) {
                 add(-12, "looks like a modding/editor tool".into());
             }
             if norm.contains("benchmark") {

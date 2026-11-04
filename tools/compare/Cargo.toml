@@ -1,0 +1,11 @@
+[package]
+edition = "2021"
+name = "compare"
+version = "0.1.0"
+description = "Benchmark: BoilR's standalone folder scanner vs BoilerSteamXL's scanner on a synthetic games folder"
+publish = false
+
+[dependencies]
+boilr = { path = "../..", default-features = false }
+bsxl-engine = { path = "../../crates/bsxl-engine" }
+serde_json.workspace = true

@@ -107,7 +107,9 @@ pub fn title_from_folder(folder: &str) -> String {
         if piece.is_empty() || piece == "-" {
             continue;
         }
-        if is_version(piece) {
+        // Dotted initials stay one word: "S.T.A.L.K.E.R.", "F.E.A.R.".
+        let initials = piece.split('.').filter(|s| !s.is_empty()).collect::<Vec<_>>();
+        if is_version(piece) || (initials.len() >= 2 && piece.contains('.') && initials.iter().all(|s| s.chars().count() == 1 && s.chars().all(char::is_alphabetic))) {
             tokens.push(piece.to_string());
         } else {
             for part in piece.split('.').filter(|s| !s.is_empty()) {
@@ -281,6 +283,8 @@ mod tests {
     fn repack_labels_are_removed() {
         assert_eq!(title_from_folder("Elden.Ring.v1.10-FitGirl.Repack"), "Elden Ring");
         assert_eq!(title_from_folder("Hollow Knight [FitGirl Repack]"), "Hollow Knight");
+        assert_eq!(title_from_folder("S.T.A.L.K.E.R. Anomaly"), "S.T.A.L.K.E.R. Anomaly");
+        assert_eq!(title_from_folder("F.E.A.R.-FitGirl.Repack"), "F.E.A.R.");
         assert_eq!(title_from_folder("Cyberpunk 2077 (v2.1 + DLC) [DODI Repack]"), "Cyberpunk 2077");
         assert_eq!(title_from_folder("Sekiro.Shadows.Die.Twice.MULTi13-ElAmigos"), "Sekiro Shadows Die Twice");
         assert_eq!(title_from_folder("Hades_Build_12345"), "Hades");

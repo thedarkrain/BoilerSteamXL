@@ -114,7 +114,7 @@ let entries: Entry[] = [
     confidence: 58,
     uncertain: true,
   }),
-  entry({ id: "fs:halo", title: "Halo", game_dir: "D:\\Games\\Halo", candidates: [cand("D:\\Games\\Halo\\haloce.exe", 96, 5, ["+28 name is the game's initials", "+10 in the game's main folder", "+6 file size 5.0 MB"])], confidence: 96 }),
+  entry({ id: "fs:halo", title: "Halo: Combat Evolved", game_dir: "D:\\Games\\Halo", candidates: [cand("D:\\Games\\Halo\\haloce.exe", 96, 5, ["+28 name is the game's initials", "+10 in the game's main folder", "+6 file size 5.0 MB"])], confidence: 96 }),
   entry({ id: "fs:codwaw", title: "Call of Duty: World at War", game_dir: "D:\\Games\\call.of.duty.world.at.war", candidates: [cand("D:\\Games\\call.of.duty.world.at.war\\CoDWaW.exe", 99, 10, ["+28 name is the game's initials", "+10 in the game's main folder", "+10 file size 10.0 MB"])], confidence: 99, status: "approved", approval: { fingerprint: "x", at: ago(1), allow_duplicate: false } }),
   entry({ id: "fs:hk", title: "Hollow Knight", game_dir: "D:\\Games\\Hollow.Knight.v1.5.78-FitGirl.Repack", candidates: [cand("D:\\Games\\Hollow.Knight.v1.5.78-FitGirl.Repack\\hollow_knight.exe", 99, 15, ["+35 name matches the game folder", "+15 Unity player (has hollow_knight_Data)"])], confidence: 99, status: "imported", import: { app_id: 3112849234, identity: "bsxl-1", user_ids: ["48151623"], at: ago(48), name: "Hollow Knight", exe: "", launch_options: "" } }),
   entry({ id: "fs:w3", title: "The Witcher 3: Wild Hunt", game_dir: "D:\\Games\\the-witcher-3-wild-hunt", candidates: [cand("D:\\Games\\the-witcher-3-wild-hunt\\bin\\x64\\witcher3.exe", 94, 60, ["+25 name contains the game name", "-4 2 folder(s) deep (bin\\x64)", "+12 file size 60.0 MB"])], confidence: 94, status: "imported", import: { app_id: 2849123001, identity: "bsxl-2", user_ids: ["48151623"], at: ago(48), name: "The Witcher 3: Wild Hunt", exe: "", launch_options: "" } }),
@@ -140,6 +140,52 @@ const owner: Record<string, string> = { "Hollow Knight": "fs:hk", "The Witcher 3
 let removals = new Set<string>();
 const steamGames = () =>
   shortcuts.map((s, i) => ({ key: `48151623#${3000000000 + i}#${i}`, user_id: "48151623", app_id: 3000000000 + i, name: s.name, exe: s.exe.replace(/"/g, ""), start_dir: "", launch_options: s.args, made_by: s.managed ? "BoilerSteamXL" : s.boilr ? "BoilR" : "", exe_exists: s.exists, entry_id: owner[s.name] ?? null, removal: removals.has(s.name) }));
+// "?showcase": recent big releases instead of the test samples, for README screenshots
+// (with the SteamGridDB dev proxy every one of them has artwork). Tests use the samples above.
+if (location.search.includes("showcase")) {
+  const D = "D:\\Games";
+  const game = (id: string, title: string, folder: string, exe: string, p: Partial<Entry> = {}) =>
+    entry({ id: `fs:${id}`, title, game_dir: `${D}\\${folder}`, candidates: [cand(`${D}\\${folder}\\${exe}`, 92, 60, ["+35 name matches the game folder", "+10 in the game's main folder", "+10 file size"])], confidence: 92, ...p });
+  const imported = (title: string, folder: string, exe: string) => ({
+    status: "imported" as const,
+    import: { app_id: 3100000000 + title.length, identity: `bsxl:${title}`, user_ids: ["48151623"], at: ago(48), name: title, exe: `${D}\\${folder}\\${exe}`, launch_options: "" },
+  });
+  entries = [
+    game("wukong", "Black Myth: Wukong", "Black Myth Wukong", "b1.exe", imported("Black Myth: Wukong", "Black Myth Wukong", "b1.exe")),
+    game("e33", "Clair Obscur: Expedition 33", "Clair.Obscur.Expedition.33-FitGirl.Repack", "Expedition33.exe"),
+    game("kcd2", "Kingdom Come: Deliverance II", "kingdom-come-deliverance-ii", "KingdomCome.exe"),
+    game("split", "Split Fiction", "Split Fiction", "SplitFiction.exe", {
+      status: "possible_duplicate",
+      duplicate: { confidence: "medium", reason: "Steam already has this game under another name", matched: { kind: "shortcut", name: "SplitFiction", path: `"${D}\\Split Fiction\\SplitFiction.exe"`, user_id: "48151623" } },
+    }),
+    game("mhw", "Monster Hunter Wilds", "Monster.Hunter.Wilds-DODI", "MonsterHunterWilds.exe"),
+    game("nightreign", "Elden Ring Nightreign", "ELDEN RING NIGHTREIGN", "start_protected_game.exe", { uncertain: true, confidence: 61 }),
+    game("cp2077", "Cyberpunk 2077", "Cyberpunk 2077", "bin\\x64\\Cyberpunk2077.exe", imported("Cyberpunk 2077", "Cyberpunk 2077", "bin\\x64\\Cyberpunk2077.exe")),
+    game("bg3", "Baldur's Gate 3", "Baldurs Gate 3", "bin\\bg3.exe", { status: "already_in_steam", linked: { kind: "shortcut", name: "Baldur's Gate 3", path: "", user_id: "48151623", boilr: true } }),
+    game("hades2", "Hades II", "Hades II", "Ship\\Hades2.exe"),
+    game("sh2", "Silent Hill 2", "SILENT HILL 2", "SHProto.exe"),
+    game("indy", "Indiana Jones and the Great Circle", "Indiana Jones and the Great Circle", "TheGreatCircle.exe", imported("Indiana Jones and the Great Circle", "Indiana Jones and the Great Circle", "TheGreatCircle.exe")),
+    game("silksong", "Hollow Knight: Silksong", "Hollow.Knight.Silksong.v1.0-FitGirl.Repack", "Hollow Knight Silksong.exe"),
+    game("acs", "Assassin's Creed Shadows", "Assassins Creed Shadows", "ACShadows.exe"),
+    game("stellar", "Stellar Blade", "Stellar Blade", "SB.exe"),
+    game("doom", "DOOM: The Dark Ages", "DOOM The Dark Ages", "DOOMTheDarkAges.exe", { status: "rejected" }),
+  ];
+  const sc = (name: string, exe: string, origin: string, managed: boolean, boilr: boolean) => ({ name, exe: `"${D}\\${exe}"`, origin, managed, boilr, exists: true, args: "" });
+  shortcuts.splice(
+    0,
+    shortcuts.length,
+    sc("Black Myth: Wukong", "Black Myth Wukong\\b1.exe", "BoilerSteamXL", true, false),
+    sc("Cyberpunk 2077", "Cyberpunk 2077\\bin\\x64\\Cyberpunk2077.exe", "BoilerSteamXL", true, false),
+    sc("Indiana Jones and the Great Circle", "Indiana Jones and the Great Circle\\TheGreatCircle.exe", "BoilerSteamXL", true, false),
+    sc("Baldur's Gate 3", "Baldurs Gate 3\\bin\\bg3.exe", "BoilR", false, true),
+    sc("Split Fiction", "Split Fiction\\SplitFiction.exe", "BoilR", false, true),
+    sc("SplitFiction", "Split Fiction\\SplitFiction.exe", "Other / manual", false, false),
+    sc("Ghost of Tsushima DIRECTOR'S CUT", "Ghost of Tsushima\\GhostOfTsushima.exe", "Other / manual", false, false),
+    sc("Red Dead Redemption 2", "Red Dead Redemption 2\\RDR2.exe", "BoilR", false, true)
+  );
+  for (const k of Object.keys(owner)) delete owner[k];
+  Object.assign(owner, { "Black Myth: Wukong": "fs:wukong", "Cyberpunk 2077": "fs:cp2077", "Indiana Jones and the Great Circle": "fs:indy", "Baldur's Gate 3": "fs:bg3" });
+}
 const suggestFor: Record<string, [string, string, boolean]> = {
   "A Way Out": ["fs:awo", "same executable", true],
   "A Way Out Copy": ["fs:awo", "same executable", true],
@@ -240,6 +286,62 @@ const planRebuild = (): Plan => {
     kind: "rebuild", mode: d.mode, user_ids: ["48151623"], ops, blocked, warnings: [], simulation: prefs.simulation_mode, token: "mock-rebuild",
     summary: { before: shortcuts.length, after: shortcuts.length + c("create") - c("remove"), keep: c("keep"), create: c("create"), replace: c("replace"), update: 0, remove: c("remove"), unresolved: c("unresolved"), blocked: blocked.length, duplicates_created: 0, still_review: counts().needs_review ?? 0, out_of_scope: 0 },
   };
+};
+
+// Browser dev only: with the dev server's SteamGridDB proxy (BOILR_SGDB_KEY_FILE, see vite.config.ts)
+// the sample games get real artwork, as the app shows them once a key is set.
+// Two requests at a time with retries: SteamGridDB refuses bursts.
+let sgdbSlots = 2;
+const sgdbWaiting: (() => void)[] = [];
+const sgdb = async (path: string) => {
+  if (sgdbSlots === 0) await new Promise<void>((r) => sgdbWaiting.push(r));
+  sgdbSlots--;
+  try {
+    for (let attempt = 0; attempt < 4; attempt++) {
+      try {
+        const res = await fetch(`/sgdb${path}`);
+        if (res.ok) {
+          const r = await res.json();
+          return r.success ? r.data : null;
+        }
+      } catch {
+        /* retry */
+      }
+      await new Promise((r) => setTimeout(r, 800 * (attempt + 1)));
+    }
+    return null;
+  } finally {
+    sgdbSlots++;
+    sgdbWaiting.shift()?.();
+  }
+};
+const artCache = new Map<string, Promise<Record<string, unknown> | null>>();
+const realArt = (title: string) => {
+  if (!artCache.has(title))
+    artCache.set(
+      title,
+      (async () => {
+        const hits: { id: number; name: string }[] = (await sgdb(`/search/autocomplete/${encodeURIComponent(title)}`)) ?? [];
+        // Same rule as bsxl_engine::same_title: case, punctuation and Roman numerals don't matter.
+        const roman: Record<string, string> = { ii: "2", iii: "3", iv: "4", v: "5", vi: "6", vii: "7", viii: "8", ix: "9" };
+        const norm = (x: string) => x.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean).map((t) => roman[t] ?? t).join("");
+        const hit = hits.find((h) => norm(h.name) === norm(title)) ?? hits[0];
+        if (!hit) return null;
+        const [grids, heroes, logos, icons] = await Promise.all([
+          sgdb(`/grids/game/${hit.id}?dimensions=600x900&types=static&humor=false&nsfw=false`),
+          sgdb(`/heroes/game/${hit.id}?types=static&humor=false&nsfw=false`),
+          sgdb(`/logos/game/${hit.id}?types=static&humor=false&nsfw=false`),
+          sgdb(`/icons/game/${hit.id}`),
+        ]);
+        // The community's favourite image of each kind.
+        type Img = { url: string; thumb: string; score?: number };
+        const best = (xs: Img[] | null) => xs?.slice().sort((x, y) => (y.score ?? 0) - (x.score ?? 0))[0];
+        return { cover: best(grids)?.thumb ?? null, hero: best(heroes)?.url ?? null, logo: best(logos)?.url ?? null, icon: icons?.[0]?.thumb ?? null, source: "steamgriddb", match_name: hit.name, match_chosen: false };
+      })()
+    );
+  const art = artCache.get(title)!;
+  void art.then((a) => !a && artCache.delete(title)); // a failed lookup is tried again next time
+  return art;
 };
 
 const banner = document.createElement("div");
@@ -380,6 +482,13 @@ mockIPC(async (cmd, args) => {
     case "rebuild_draft":
       return draft;
     case "game_art": {
+      if (__SGDB_PROXY__) {
+        const pairs = await Promise.all([
+          ...entries.map(async (e) => [e.id, await realArt(e.custom_title || e.title)] as const),
+          ...steamGames().filter((g) => !g.entry_id).map(async (g) => [`steam:${g.key}`, await realArt(g.name)] as const),
+        ]);
+        return Object.fromEntries(pairs.filter(([, v]) => v));
+      }
       // Sample artwork: the app logo stands in for a game's own icon.
       const icon = `${location.origin}/src/assets/logo.png`;
       return Object.fromEntries(entries.slice(0, 6).map((e) => [e.id, { cover: null, hero: null, logo: null, icon, source: "executable", match_name: null, match_chosen: false }]));
@@ -390,7 +499,10 @@ mockIPC(async (cmd, args) => {
     case "open_steamgriddb_key_page":
     case "check_steamgriddb_key":
       return null;
+    case "artwork_thumb":
+      return __SGDB_PROXY__ ? (await sgdb(`/grids/game/${a.gameId}?dimensions=600x900`))?.[0]?.thumb ?? null : null;
     case "search_artwork":
+      if (__SGDB_PROXY__) return ((await sgdb(`/search/autocomplete/${encodeURIComponent(String(a.query))}`)) ?? []).slice(0, 8).map((g: { id: number; name: string; release_date?: number }) => ({ id: g.id, name: g.name, year: g.release_date ? new Date(g.release_date * 1000).getFullYear() : null }));
       return [1, 2, 3, 4, 5].map((id) => ({ id, name: id === 1 ? String(a.query) : `${String(a.query)} ${id}`, year: 2015 + id }));
     case "rebuild_inspect":
     case "inspect_account":
@@ -433,7 +545,7 @@ mockIPC(async (cmd, args) => {
     case "list_platform_settings":
       return [{ code_name: "epic_games", name: "Epic", settings: { enabled: true } }, { code_name: "gog", name: "GOG", settings: { enabled: true } }, { code_name: "itch", name: "Itch", settings: { enabled: false } }];
     case "load_settings":
-      return { steamgrid_db: { enabled: true, auth_key: null }, steam: {} };
+      return { steamgrid_db: { enabled: true, auth_key: __SGDB_PROXY__ ? "set" : null }, steam: {} };
     case "update_settings":
       return { steamgrid_db: { enabled: true, auth_key: "set" }, steam: {} };
     case "list_steam_accounts":

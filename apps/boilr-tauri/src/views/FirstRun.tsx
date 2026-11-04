@@ -24,7 +24,7 @@ export const FirstRun = () => {
       setSteamPath(s.path);
     });
     api.suggestRoots().then((roots) => {
-      setDraft((d) => (d && d.scan_roots.length === 0 ? { ...d, scan_roots: roots.map((path) => ({ path, enabled: true, max_depth: 6 })) } : d));
+      setDraft((d) => (d && d.scan_roots.length === 0 ? { ...d, scan_roots: roots.map((path) => ({ path, enabled: true, max_depth: 8 })) } : d));
     });
   }, []);
   if (!draft) return null;

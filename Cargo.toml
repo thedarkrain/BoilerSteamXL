@@ -1,5 +1,5 @@
 [workspace]
-members = ["crates/boilr-core", "crates/bsxl-engine"]
+members = ["crates/boilr-core", "crates/bsxl-engine", "tools/compare"]
 default-members = [".", "crates/boilr-core", "crates/bsxl-engine"]
 exclude = ["apps/boilr-tauri"]
 

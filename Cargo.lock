@@ -749,7 +749,7 @@ dependencies = [
 
 [[package]]
 name = "bsxl-engine"
-version = "1.0.0"
+version = "1.0.1"
 dependencies = [
  "boilr-core",
  "eyre",
@@ -998,6 +998,15 @@ checksum = "35ed6e9d84f0b51a7f52daf1c7d71dd136fd7a3f41a8462b8cdb8c78d920fad4"
 dependencies = [
  "bytes",
  "memchr",
+]
+
+[[package]]
+name = "compare"
+version = "0.1.0"
+dependencies = [
+ "boilr",
+ "bsxl-engine",
+ "serde_json",
 ]
 
 [[package]]

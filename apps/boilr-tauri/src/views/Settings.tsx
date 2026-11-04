@@ -46,7 +46,7 @@ export const GameFolders = ({ prefs, onChange }: { prefs: Preferences; onChange:
       className="btn-ghost"
       onClick={async () => {
         const p = await open({ directory: true });
-        if (typeof p === "string" && !prefs.scan_roots.some((r) => r.path.toLowerCase() === p.toLowerCase())) onChange({ ...prefs, scan_roots: [...prefs.scan_roots, { path: p, enabled: true, max_depth: 6 }] });
+        if (typeof p === "string" && !prefs.scan_roots.some((r) => r.path.toLowerCase() === p.toLowerCase())) onChange({ ...prefs, scan_roots: [...prefs.scan_roots, { path: p, enabled: true, max_depth: 8 }] });
       }}
     >
       <Icon name="plus" /> Add game folder
