@@ -3,22 +3,41 @@ use std::{
     path::{Path, PathBuf},
 };
 
+/// Name of the configuration folder. BoilerSteamXL keeps its own folder so it never
+/// shares state with an installed BoilR.
+pub const CONFIG_FOLDER_NAME: &str = "BoilerSteamXL";
+
+/// The portable edition (and tests) point the whole app at another folder with this.
+fn config_override() -> Option<PathBuf> {
+    ["BOILERSTEAMXL_HOME", "BOILR_CONFIG_HOME"]
+        .iter()
+        .filter_map(|key| std::env::var_os(key))
+        .find(|value| !value.is_empty())
+        .map(PathBuf::from)
+}
+
 #[cfg(target_family = "unix")]
 pub fn get_config_folder() -> PathBuf {
+    if let Some(folder) = config_override() {
+        return folder;
+    }
     let config_home = std::env::var("XDG_CONFIG_HOME");
     let home = std::env::var("HOME");
     match (config_home, home) {
-        (Ok(p), _) => Path::new(&p).join("boilr"),
-        (Err(_), Ok(home)) => Path::new(&home).join(".config").join("boilr"),
+        (Ok(p), _) => Path::new(&p).join(CONFIG_FOLDER_NAME),
+        (Err(_), Ok(home)) => Path::new(&home).join(".config").join(CONFIG_FOLDER_NAME),
         _ => Path::new("").to_path_buf(),
     }
 }
 
 #[cfg(windows)]
 pub fn get_config_folder() -> PathBuf {
+    if let Some(folder) = config_override() {
+        return folder;
+    }
     let config_home = std::env::var("APPDATA");
     match config_home {
-        Ok(p) => Path::new(&p).join("boilr"),
+        Ok(p) => Path::new(&p).join(CONFIG_FOLDER_NAME),
         Err(_) => Path::new("").to_path_buf(),
     }
 }
@@ -67,7 +86,7 @@ mod tests {
             std::env::var("HOME").unwrap_or_default() + "/.config",
         );
 
-        let xdg_config_home = std::env::var("XDG_CONFIG_HOME").unwrap_or_default() + "/boilr";
+        let xdg_config_home = std::env::var("XDG_CONFIG_HOME").unwrap_or_default() + "/BoilerSteamXL";
         let config_path = get_config_folder();
 
         assert_eq!(config_path, PathBuf::from(xdg_config_home));
@@ -82,7 +101,7 @@ mod tests {
         );
 
         let config_path = get_config_folder();
-        let current_path = std::env::var("HOME").unwrap_or_default() + "/.config/boilr";
+        let current_path = std::env::var("HOME").unwrap_or_default() + "/.config/BoilerSteamXL";
 
         assert_eq!(config_path, PathBuf::from(current_path));
     }

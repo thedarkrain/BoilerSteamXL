@@ -1,181 +1,264 @@
-@import "@fontsource/pixelify-sans/400.css";
-@import "@fontsource/pixelify-sans/600.css";
-@import "@fontsource/atkinson-hyperlegible-next/400.css";
-@import "@fontsource/atkinson-hyperlegible-next/700.css";
-
 @import "tailwindcss";
 @plugin "@tailwindcss/forms";
-/* Keep Tailwind 3's hover: v4 limits it to (hover: hover) devices, and the Deck's webview
-   may not report that. */
 @custom-variant hover (&:hover);
+@custom-variant light (&:where([data-theme="light"], [data-theme="light"] *));
 
-/* BoilR's palette is the 8-colour pixel sunset the original egui app used.
-   `initial` drops Tailwind's default colours and fonts; transparent and current stay built in. */
+/* BoilerSteamXL design tokens. Dark by default, light via data-theme="light".
+   The BoilR names (night, deep, harbour, …) map onto the same tokens so the reused
+   Artwork screen follows the theme. */
+:root {
+  --bg: #0b0e14;
+  --bg-2: #10141c;
+  --surface: #151a24;
+  --surface-2: #1b2130;
+  --surface-3: #232a3b;
+  --line: rgba(255, 255, 255, 0.07);
+  --line-strong: rgba(255, 255, 255, 0.14);
+  --text: #e7eaf2;
+  --text-2: #a4acc0;
+  --text-3: #6f788f;
+  --accent: #8b6cff;
+  --accent-2: #22c7ff;
+  --accent-ink: #ffffff;
+  --ok: #34e0a1;
+  --warn: #ffb547;
+  --bad: #ff5d6c;
+  --info: #5fa8ff;
+  --shadow: 0 10px 30px -12px rgba(0, 0, 0, 0.6);
+  color-scheme: dark;
+}
+
+[data-theme="light"] {
+  --bg: #f3f5fa;
+  --bg-2: #eceff6;
+  --surface: #ffffff;
+  --surface-2: #f6f7fb;
+  --surface-3: #e9ecf4;
+  --line: rgba(15, 23, 42, 0.08);
+  --line-strong: rgba(15, 23, 42, 0.16);
+  --text: #141a2a;
+  --text-2: #4b5468;
+  --text-3: #7b8498;
+  --accent: #6a4dff;
+  --accent-2: #0aa5dd;
+  --ok: #0e9f6e;
+  --warn: #c27a00;
+  --bad: #d92d43;
+  --info: #2563eb;
+  --shadow: 0 10px 30px -14px rgba(15, 23, 42, 0.25);
+  color-scheme: light;
+}
+
 @theme {
   --color-*: initial;
-  --color-night: #0d2b45;
-  --color-deep: #0a1e3c;
-  --color-harbour: #203c56;
-  --color-dusk: #544e68;
-  --color-mauve: #8d697a;
-  --color-ember: #d08159;
-  --color-flame: #ffaa5e;
-  --color-peach: #ffd4a3;
-  --color-foam: #ffecd6;
+  --color-bg: var(--bg);
+  --color-bg-2: var(--bg-2);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-text: var(--text);
+  --color-text-2: var(--text-2);
+  --color-text-3: var(--text-3);
+  --color-accent: var(--accent);
+  --color-accent-2: var(--accent-2);
+  --color-ok: var(--ok);
+  --color-warn: var(--warn);
+  --color-bad: var(--bad);
+  --color-info: var(--info);
+  --color-white: #fff;
+  --color-black: #000;
+
+  /* BoilR palette names, used by the Artwork screen. */
+  --color-night: var(--bg);
+  --color-deep: var(--surface);
+  --color-harbour: var(--surface-3);
+  --color-dusk: var(--surface-3);
+  --color-mauve: var(--text-3);
+  --color-ember: var(--warn);
+  --color-flame: var(--accent);
+  --color-peach: var(--text-2);
+  --color-foam: var(--text);
 
   --font-*: initial;
-  --font-pixel: "Pixelify Sans", monospace;
-  --font-sans: "Atkinson Hyperlegible Next", system-ui, sans-serif;
+  --font-sans: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  --font-display: "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif;
+  --font-pixel: "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "Cascadia Mono", "Consolas", ui-monospace, monospace;
 }
 
 @layer base {
-  /* Tailwind 4 dropped the pointer cursor on buttons; BoilR keeps it. */
   button:not(:disabled),
   [role="button"]:not(:disabled) {
     cursor: pointer;
   }
-}
-
-:root {
-  color-scheme: dark;
-}
-
-html,
-body,
-#root {
-  height: 100%;
-}
-
-body {
-  @apply bg-night font-sans text-peach antialiased;
-  font-size: 15px;
-  line-height: 1.45;
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-sans);
+    font-size: 14px;
+    line-height: 1.45;
+    -webkit-font-smoothing: antialiased;
+  }
+  ::selection {
+    background: color-mix(in srgb, var(--accent) 40%, transparent);
+  }
 }
 
 :focus-visible {
-  outline: 2px solid var(--color-flame);
+  outline: 2px solid var(--accent-2);
   outline-offset: 2px;
-}
-/* Fields show focus with their flame border instead. */
-.field:focus-visible {
-  outline: 2px solid transparent;
-  outline-offset: 2px;
-}
-
-/* With a controller or arrow keys there is no pointer, so focus must always be obvious. */
-/* Inset, so scroll areas don't clip it. */
-body.nav-controller :focus:not(input) {
-  outline: 3px solid var(--color-flame);
-  outline-offset: -3px;
-}
-body.nav-controller label:focus-within {
-  outline: 3px solid var(--color-flame);
-  outline-offset: 2px;
-}
-
-/* Stepped 4px corners, like the pixel art. */
-@utility notch {
-  clip-path: polygon(
-    0 4px, 4px 4px, 4px 0, calc(100% - 4px) 0, calc(100% - 4px) 4px, 100% 4px,
-    100% calc(100% - 4px), calc(100% - 4px) calc(100% - 4px), calc(100% - 4px) 100%,
-    4px 100%, 4px calc(100% - 4px), 0 calc(100% - 4px)
-  );
-}
-
-@utility pixelated {
-  image-rendering: pixelated;
+  border-radius: 6px;
 }
 
 @utility scroll-quiet {
   scrollbar-width: thin;
-  scrollbar-color: var(--color-dusk) transparent;
+  scrollbar-color: var(--surface-3) transparent;
+}
+@utility notch {
+  border-radius: 10px;
+}
+@utility pixelated {
+  image-rendering: auto;
+}
+@utility border-3 {
+  border-width: 1px;
+}
+@utility border-b-3 {
+  border-bottom-width: 1px;
+}
+@utility border-l-3 {
+  border-left-width: 3px;
+}
+@utility outline-3 {
+  outline-width: 2px;
+}
+
+@utility btn {
+  @apply inline-flex items-center justify-center gap-2 rounded-lg px-3.5 py-2 text-[13px] font-semibold
+    transition-all duration-150 select-none disabled:cursor-not-allowed disabled:opacity-45;
+}
+@utility btn-sm {
+  @apply px-2.5 py-1.5 text-xs;
 }
 
 @layer components {
   .btn-primary,
-  .btn-quiet {
-    @apply notch inline-flex items-center justify-center gap-2 px-4 py-2 font-pixel text-base
-      transition-colors disabled:cursor-not-allowed;
+  .btn-accent {
+    @apply btn text-white;
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    box-shadow: 0 6px 20px -8px color-mix(in srgb, var(--accent) 70%, transparent);
   }
-  .btn-primary {
-    @apply bg-flame text-deep hover:bg-peach disabled:bg-harbour disabled:text-mauve;
+  .btn-primary:hover:not(:disabled),
+  .btn-accent:hover:not(:disabled) {
+    filter: brightness(1.08);
+    transform: translateY(-1px);
   }
-  .btn-quiet {
-    @apply bg-harbour text-peach hover:bg-dusk disabled:bg-harbour disabled:text-mauve;
+  .btn-quiet,
+  .btn-ghost {
+    @apply btn border border-line bg-surface-2 text-text hover:border-line-strong hover:bg-surface-3;
+  }
+  .btn-danger {
+    @apply btn bg-bad text-white hover:brightness-110;
   }
   .link-btn {
-    @apply text-sm text-flame underline decoration-2 underline-offset-4 hover:text-peach
-      disabled:cursor-not-allowed disabled:opacity-50;
+    @apply text-[13px] font-semibold text-accent-2 hover:underline disabled:opacity-50;
   }
-
   .field {
-    @apply w-full border-2 border-harbour bg-deep px-3 py-2 text-foam placeholder:text-mauve
-      focus:border-flame focus:ring-0;
+    @apply w-full rounded-lg border border-line bg-bg-2 px-3 py-2 text-[13px] text-text placeholder:text-text-3
+      focus:border-accent focus:ring-0;
+  }
+  select.field {
+    @apply pr-8;
+  }
+  .card {
+    @apply rounded-xl border border-line bg-surface;
+    box-shadow: var(--shadow);
+  }
+  .panel {
+    @apply rounded-xl border border-line bg-surface;
+  }
+  .chip {
+    @apply inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-semibold whitespace-nowrap;
+  }
+  .label {
+    @apply text-[11px] font-semibold tracking-wider text-text-3 uppercase;
+  }
+  .h1 {
+    @apply font-display text-[26px] font-semibold tracking-tight text-text;
+  }
+  .h2 {
+    @apply font-display text-lg font-semibold text-text;
+  }
+  .mono {
+    font-family: var(--font-mono);
+    font-size: 12px;
+  }
+  .check {
+    @apply h-4 w-4 rounded border-line-strong bg-bg-2 text-accent focus:ring-0 focus:ring-offset-0;
+  }
+  .toggle {
+    @apply relative inline-flex h-5 w-9 flex-none items-center rounded-full bg-surface-3 transition-colors;
+  }
+  .toggle[aria-checked="true"] {
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  }
+  .toggle > span {
+    @apply inline-block h-4 w-4 translate-x-0.5 rounded-full bg-white shadow transition-transform;
+  }
+  .toggle[aria-checked="true"] > span {
+    @apply translate-x-[18px];
   }
 }
 
-/* Stepped corners clip outlines, so a focused pixel button lights up instead.
-   Outside a layer so it beats the unlayered outline rules above. */
-.btn-primary:focus:not(:disabled),
-.btn-quiet:focus:not(:disabled) {
-  outline: none;
-  background-color: var(--color-foam);
-  color: var(--color-deep);
+.gradient-text {
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
 }
 
-/* Copper pipe with a rivet every 40px. */
-.pipe {
+.hero-glow {
   background:
-    repeating-linear-gradient(
-      90deg,
-      transparent 0 36px,
-      var(--color-ember) 36px 40px
-    ),
-    var(--color-flame);
-  background-size: 100% 4px, auto;
-  background-position: 0 50%, 0 0;
-  background-repeat: repeat-x;
+    radial-gradient(1200px 300px at 10% -20%, color-mix(in srgb, var(--accent) 22%, transparent), transparent 60%),
+    radial-gradient(900px 260px at 90% -30%, color-mix(in srgb, var(--accent-2) 18%, transparent), transparent 60%);
 }
 
-/* Steam puffs travelling along the pipe while a sync runs. */
-@keyframes puff {
-  0% {
-    transform: translateX(0) scale(0.6);
+@keyframes fade-up {
+  from {
     opacity: 0;
+    transform: translateY(6px);
   }
-  15% {
+  to {
     opacity: 1;
+    transform: none;
+  }
+}
+.animate-in {
+  animation: fade-up 0.22s ease-out both;
+}
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
   }
   100% {
-    transform: translate(var(--pipe-length), -10px) scale(1.4);
-    opacity: 0;
+    background-position: 200% 0;
   }
 }
-
-@keyframes simmer {
-  0%,
-  100% {
-    transform: translateY(0);
-  }
-  50% {
-    transform: translateY(-2px);
-  }
+.progress-indeterminate {
+  background: linear-gradient(90deg, transparent, var(--accent), var(--accent-2), transparent);
+  background-size: 200% 100%;
+  animation: shimmer 1.3s linear infinite;
 }
-
-.puff {
-  animation: puff 1.8s steps(12) infinite;
-}
-
-.simmer {
-  animation: simmer 0.6s steps(2) infinite;
-}
-
 @media (prefers-reduced-motion: reduce) {
-  .puff,
-  .simmer {
+  .animate-in,
+  .progress-indeterminate {
     animation: none;
-  }
-  .puff {
-    opacity: 0;
   }
 }

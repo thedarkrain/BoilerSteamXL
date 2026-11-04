@@ -1,0 +1,20 @@
+[package]
+edition = "2021"
+name = "bsxl-engine"
+version = "1.0.0"
+description = "BoilerSteamXL engine: game discovery, exclusion rules, review queue, duplicate detection and approval-gated Steam import"
+publish = false
+
+[dependencies]
+boilr-core = { path = "../boilr-core" }
+eyre.workspace = true
+pelite = { version = "0.10", default-features = false, features = ["mmap", "std"] }
+regex = "1.12"
+serde.workspace = true
+serde_json.workspace = true
+steam_shortcuts_util.workspace = true
+sysinfo.workspace = true
+time = { version = "^0.3.47", features = ["formatting", "parsing", "local-offset", "macros"] }
+
+[target."cfg(windows)".dependencies]
+winreg = "^0.56.0"

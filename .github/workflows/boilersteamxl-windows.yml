@@ -1,0 +1,41 @@
+name: BoilerSteamXL Windows build
+
+on:
+  push:
+    branches: [main]
+    tags: ["bsxl-v*"]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            . -> target
+            apps/boilr-tauri -> target
+      - name: Engine tests (synthetic Steam fixtures only)
+        run: cargo test -p bsxl-engine
+      - name: App tests
+        working-directory: apps/boilr-tauri
+        run: cargo test
+      - name: Build installer and portable zip
+        shell: pwsh
+        run: ./scripts/build-release.ps1 -SkipTests
+      - uses: actions/upload-artifact@v4
+        with:
+          name: BoilerSteamXL-Win64
+          path: dist-release/*
+      - name: Draft release for tags
+        if: startsWith(github.ref, 'refs/tags/bsxl-v')
+        uses: softprops/action-gh-release@v2
+        with:
+          draft: true
+          files: dist-release/*

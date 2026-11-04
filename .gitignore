@@ -17,3 +17,7 @@ planning.md
 .flatpak-repo/
 .flatpak-builder/
 *.flatpak
+
+# BoilerSteamXL
+dist-release/
+apps/boilr-tauri/node_modules/

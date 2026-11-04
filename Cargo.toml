@@ -1,6 +1,6 @@
 [workspace]
-members = ["crates/boilr-core"]
-default-members = [".", "crates/boilr-core"]
+members = ["crates/boilr-core", "crates/bsxl-engine"]
+default-members = [".", "crates/boilr-core", "crates/bsxl-engine"]
 exclude = ["apps/boilr-tauri"]
 
 [workspace.dependencies]

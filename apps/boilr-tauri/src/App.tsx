@@ -1,386 +1,407 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { invoke } from "@tauri-apps/api/core";
-import { listen } from "@tauri-apps/api/event";
 import clsx from "clsx";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { listen } from "@tauri-apps/api/event";
 
-import logo from "./assets/logo32.png";
-import type {
-  PlatformSettingsPayload,
-  PlatformSummary,
-  PlatformToggleResponse,
-  SettingsUpdatePayload,
-  ShortcutSummary,
-  SyncOutcome,
-  SyncPlan,
-  SyncProgressEvent,
-} from "./types";
-import type { Settings } from "./settings";
-import { errorMessage } from "./lib/format";
-import {
-  buildPlatformSettingsGroup,
-  buildPlatformSettingsPayload,
-  mergeOptionalFieldKinds,
-  resetGroup,
-} from "./lib/platformSettings";
-import type { PlatformFieldUpdate, PlatformSettingsGroup } from "./lib/platformSettings";
-import { GameList } from "./components/GameList";
-import { PipeBar } from "./components/PipeBar";
-import { Sources } from "./components/Sources";
-import { SettingsView } from "./components/SettingsView";
-import { ShortcutsView } from "./components/ShortcutsView";
+import logo from "./assets/logo.png";
+import { api, pendingRename, syncEligible, type AppInfo, type ArtProgress, type GameArt, type LibraryView, type Preferences, type ScanProgress, type ScanSummary, type SteamGame } from "./api";
+import { toImageSrc } from "./lib/format";
+import { Icon, ToastProvider, errorText, plural, useToast } from "./ui";
+import { Dashboard } from "./views/Dashboard";
+import { Games } from "./views/Games";
+import { Review } from "./views/Review";
+import { Discover } from "./views/Discover";
+import { SteamLibrary } from "./views/SteamLibrary";
+import { Rebuild } from "./views/Rebuild";
+import { Rules } from "./views/Rules";
+import { Automation } from "./views/Automation";
+import { Backups } from "./views/Backups";
+import { SettingsView } from "./views/Settings";
+import { FirstRun } from "./views/FirstRun";
+import { AddGame } from "./views/AddGame";
+import { ImportDialog } from "./views/ImportDialog";
 import { ArtworkView } from "./components/ArtworkView";
-import { useNavigation } from "./lib/navigation";
+import type { Settings } from "./settings";
+import { invoke } from "@tauri-apps/api/core";
 
-const VIEWS = ["games", "artwork", "shortcuts", "settings"] as const;
-type View = (typeof VIEWS)[number];
-const VIEW_LABELS: Record<View, string> = { games: "Games", artwork: "Artwork", shortcuts: "Shortcuts", settings: "Settings" };
+export type View =
+  | "dashboard"
+  | "games"
+  | "review"
+  | "discover"
+  | "steam"
+  | "rebuild"
+  | "artwork"
+  | "rules"
+  | "automation"
+  | "backups"
+  | "settings";
 
-const applySettingsPatch = (current: Settings | null, patch: SettingsUpdatePayload): Settings | null => {
-  if (!current) return current;
-  return {
-    ...current,
-    steam: { ...(current.steam ?? {}), ...(patch.steam ?? {}) },
-    steamgrid_db: { ...(current.steamgrid_db ?? {}), ...(patch.steamgrid_db ?? {}) },
-    blacklisted_games: patch.blacklisted_games ? [...patch.blacklisted_games] : current.blacklisted_games,
-  };
+type NavItem = { view: View; label: string; icon: string };
+/** All most people need: their games (on this PC and in Steam) and settings. */
+const NAV: NavItem[] = [
+  { view: "games", label: "My Games", icon: "games" },
+  { view: "settings", label: "Settings", icon: "settings" },
+];
+/** Everything else, folded away under "More tools". */
+const TOOLS: NavItem[] = [
+  { view: "review", label: "Review queue", icon: "review" },
+  { view: "dashboard", label: "Overview", icon: "dashboard" },
+  { view: "discover", label: "Discover Games", icon: "search" },
+  { view: "steam", label: "Steam Library", icon: "steam" },
+  { view: "artwork", label: "Artwork Manager", icon: "artwork" },
+  { view: "rebuild", label: "Clean Rebuild", icon: "rebuild" },
+  { view: "rules", label: "Exclusion Rules", icon: "rules" },
+  { view: "automation", label: "Automation", icon: "automation" },
+  { view: "backups", label: "Backups & History", icon: "backups" },
+];
+
+type AppContextValue = {
+  info: AppInfo | null;
+  prefs: Preferences | null;
+  library: LibraryView | null;
+  go: (view: View) => void;
+  reload: () => Promise<void>;
+  savePrefs: (prefs: Preferences) => Promise<boolean>;
+  refresh: () => Promise<ScanSummary | null>;
+  scanning: boolean;
+  openAddGame: () => void;
+  openImport: () => void;
+  /** Non-Steam shortcuts in Steam now. */
+  steamGames: SteamGame[];
+  /** Adds the clear-cut new games and opens the sync confirmation. */
+  startSync: () => Promise<void>;
+  /** Artwork per entry id, ready to use as image sources. */
+  art: Record<string, { cover: string | null; icon: string | null; hero: string | null; logo: string | null; source: string | null; match: string | null }>;
+  reloadArt: () => Promise<void>;
+  fetchArt: (ids?: string[] | null, force?: boolean) => Promise<void>;
+  artProgress: ArtProgress | null;
+  hasArtKey: boolean;
 };
 
-const withItem = <T,>(set: Set<T>, item: T, present: boolean): Set<T> => {
-  const next = new Set(set);
-  if (present) next.add(item);
-  else next.delete(item);
-  return next;
+const AppContext = createContext<AppContextValue | null>(null);
+export const useApp = () => {
+  const ctx = useContext(AppContext);
+  if (!ctx) throw new Error("useApp outside provider");
+  return ctx;
 };
 
-const App = () => {
-  const [settings, setSettings] = useState<Settings | null>(null);
-  const [platforms, setPlatforms] = useState<PlatformSummary[]>([]);
-  const [plan, setPlan] = useState<SyncPlan | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState<string | null>(null);
-  const [rescanning, setRescanning] = useState(false);
+const Shell = () => {
+  const toast = useToast();
+  const [info, setInfo] = useState<AppInfo | null>(null);
+  const [prefs, setPrefs] = useState<Preferences | null>(null);
+  const [library, setLibrary] = useState<LibraryView | null>(null);
+  const [view, setViewState] = useState<View>(() => ([...NAV, ...TOOLS].some((n) => `#${n.view}` === location.hash) ? (location.hash.slice(1) as View) : "games"));
+  const [moreOpen, setMoreOpen] = useState(false);
+  const setView = useCallback((v: View) => {
+    history.replaceState(null, "", `#${v}`);
+    setViewState(v);
+  }, []);
+  const [scanning, setScanning] = useState(false);
+  const [progress, setProgress] = useState<ScanProgress | null>(null);
+  const [summary, setSummary] = useState<ScanSummary | null>(null);
+  const [addOpen, setAddOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
+  const [boilrSettings, setBoilrSettings] = useState<Settings | null>(null);
+  const [startupDone, setStartupDone] = useState(false);
+  const [rawArt, setRawArt] = useState<Record<string, GameArt>>({});
+  const [artProgress, setArtProgress] = useState<ArtProgress | null>(null);
+  const hasArtKey = Boolean(boilrSettings?.steamgrid_db?.auth_key?.trim());
 
-  const [view, setView] = useState<View>("games");
-  const [filter, setFilter] = useState("all");
-  const [focusPlatform, setFocusPlatform] = useState<string | null>(null);
+  const reloadArt = useCallback(async () => {
+    try {
+      setRawArt(await api.gameArt());
+    } catch {
+      /* artwork is optional */
+    }
+  }, []);
+  const fetchArt = useCallback(
+    async (ids: string[] | null = null, force = false) => {
+      if (!hasArtKey) return;
+      try {
+        await api.fetchArtwork(ids, force);
+      } catch (e) {
+        toast("bad", errorText(e));
+      } finally {
+        setArtProgress(null);
+        await reloadArt();
+      }
+    },
+    [hasArtKey, reloadArt, toast]
+  );
+  const art = useMemo(() => {
+    const out: AppContextValue["art"] = {};
+    for (const [id, a] of Object.entries(rawArt)) {
+      // The version makes a re-downloaded image (same file name) load again instead of the cached one.
+      const v = a.version ?? undefined;
+      out[id] = { cover: toImageSrc(a.cover, v), icon: toImageSrc(a.icon, v), hero: toImageSrc(a.hero, v), logo: toImageSrc(a.logo, v), source: a.source, match: a.match_name };
+    }
+    return out;
+  }, [rawArt]);
 
-  const [syncing, setSyncing] = useState(false);
-  const [syncError, setSyncError] = useState<string | null>(null);
-  const [outcome, setOutcome] = useState<SyncOutcome | null>(null);
-  const [progress, setProgress] = useState<SyncProgressEvent>({ state: "not_started" });
+  const [steamGames, setSteamGames] = useState<SteamGame[]>([]);
+  const reload = useCallback(async () => {
+    const [i, p, l, g] = await Promise.all([api.appInfo(), api.getPrefs(), api.library(), api.steamGames().catch(() => [] as SteamGame[])]);
+    setInfo(i);
+    setPrefs(p);
+    setLibrary(l);
+    setSteamGames(g);
+  }, []);
 
-  const [settingsError, setSettingsError] = useState<string | null>(null);
-  const [platformBusy, setPlatformBusy] = useState<Set<string>>(() => new Set());
-  const [platformGroups, setPlatformGroups] = useState<PlatformSettingsGroup[]>([]);
-  const [platformLoading, setPlatformLoading] = useState(false);
-  const [platformError, setPlatformError] = useState<string | null>(null);
-  const [platformSaving, setPlatformSaving] = useState<Set<string>>(() => new Set());
-
+  const lastArtReload = useRef(0);
   useEffect(() => {
-    let active = true;
-    let unlisten: (() => void) | null = null;
-    listen<SyncProgressEvent>("sync-progress", (event) => {
-      if (active) setProgress(event.payload);
-    })
-      .then((stop) => {
-        unlisten = stop;
-      })
-      .catch((err) => console.error("Failed to listen for sync progress", err));
+    reload().catch((e) => toast("bad", errorText(e)));
+    invoke<Settings>("load_settings").then(setBoilrSettings).catch(() => undefined);
+    const stop = listen<ScanProgress>("scan-progress", (e) => setProgress(e.payload));
+    const stopArt = listen<ArtProgress>("artwork-progress", (e) => {
+      setArtProgress(e.payload.done >= e.payload.total ? null : e.payload);
+      // Covers show up as they arrive, but at most every few seconds (each reload reads Steam).
+      if (Date.now() - lastArtReload.current > 3000) {
+        lastArtReload.current = Date.now();
+        void reloadArt();
+      }
+    });
+    void reloadArt();
     return () => {
-      active = false;
-      unlisten?.();
+      void stop.then((f) => f());
+      void stopArt.then((f) => f());
     };
-  }, []);
+  }, [reload, toast, reloadArt]);
 
-  const fetchAll = useCallback(async () => {
-    const [s, p, pl] = await Promise.all([
-      invoke<Settings>("load_settings"),
-      invoke<PlatformSummary[]>("discover_games"),
-      invoke<SyncPlan>("plan_sync"),
-    ]);
-    setSettings(s);
-    setPlatforms(p);
-    setPlan(pl);
-  }, []);
-
-  const fetchPlatformSettings = useCallback(async () => {
-    setPlatformError(null);
-    setPlatformLoading(true);
-    try {
-      const payload = await invoke<PlatformSettingsPayload[]>("list_platform_settings");
-      setPlatformGroups(payload.map(buildPlatformSettingsGroup));
-    } catch (err) {
-      setPlatformError(errorMessage(err));
-    } finally {
-      setPlatformLoading(false);
-    }
-  }, []);
+  // Download missing artwork in the background whenever the library changes.
+  const entryCount = library?.entries.length ?? 0;
+  useEffect(() => {
+    if (hasArtKey && prefs?.download_artwork && prefs.first_run_complete && entryCount > 0) void fetchArt();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasArtKey, prefs?.download_artwork, prefs?.first_run_complete, entryCount, library?.last_scan?.at]);
 
   useEffect(() => {
-    fetchAll()
-      .catch((err) => setLoadError(errorMessage(err)))
-      .finally(() => setLoading(false));
-  }, [fetchAll]);
+    document.documentElement.dataset.theme = prefs?.theme === "light" ? "light" : "dark";
+  }, [prefs?.theme]);
 
+  const savePrefs = useCallback(
+    async (next: Preferences) => {
+      try {
+        setPrefs(await api.savePrefs(next));
+        setInfo(await api.appInfo());
+        return true;
+      } catch (e) {
+        toast("bad", errorText(e));
+        return false;
+      }
+    },
+    [toast]
+  );
+
+  const refresh = useCallback(async () => {
+    if (scanning) return null;
+    setScanning(true);
+    setProgress(null);
+    try {
+      const result = await api.refresh();
+      setSummary(result);
+      await reload();
+      return result;
+    } catch (e) {
+      toast("bad", errorText(e));
+      return null;
+    } finally {
+      setScanning(false);
+      setProgress(null);
+    }
+  }, [scanning, reload, toast]);
+
+  // "Scan on startup" (refresh = discovery only; nothing is imported).
   useEffect(() => {
-    if (view === "settings") void fetchPlatformSettings();
-    else setFocusPlatform(null);
-  }, [view, fetchPlatformSettings]);
-
-  const rescan = useCallback(async () => {
-    setRescanning(true);
-    setLoadError(null);
-    try {
-      await fetchAll();
-      if (view === "settings") await fetchPlatformSettings();
-    } catch (err) {
-      setLoadError(errorMessage(err));
-    } finally {
-      setRescanning(false);
+    if (!startupDone && prefs?.first_run_complete && prefs.schedule.scan_on_startup) {
+      setStartupDone(true);
+      void refresh();
     }
-  }, [fetchAll, fetchPlatformSettings, view]);
+  }, [prefs, startupDone, refresh]);
 
-  const updateSettings = useCallback(
-    async (patch: SettingsUpdatePayload) => {
-      setSettingsError(null);
-      setSettings((prev) => applySettingsPatch(prev, patch));
+  const pending = (library?.counts.needs_review ?? 0) + (library?.counts.possible_duplicate ?? 0) + (library?.counts.update_available ?? 0);
+  const toAdd = (library?.entries ?? []).filter((e) => e.status === "approved" || e.status === "ready_to_import" || syncEligible(e)).length;
+  const renames = (library?.entries ?? []).filter((e) => !(e.status === "approved" || e.status === "ready_to_import") && pendingRename(e, steamGames)).length;
+  const changes = toAdd + renames + steamGames.filter((g) => g.removal).length;
+
+  const startSync = useCallback(async () => {
+    // The clear-cut new games the user left in are approved now; the confirmation shows every change.
+    if (library?.entries.some(syncEligible)) {
       try {
-        setSettings(await invoke<Settings>("update_settings", { update: patch }));
-        if (patch.blacklisted_games) setPlan(await invoke<SyncPlan>("plan_sync"));
-      } catch (err) {
-        setSettingsError(errorMessage(err));
-        await fetchAll().catch(() => undefined);
+        await api.approveEligible();
+      } catch (e) {
+        toast("warn", errorText(e));
       }
-    },
-    [fetchAll]
-  );
-
-  // A game is selected unless it is on the blacklist.
-  const blacklist = useMemo(() => new Set(settings?.blacklisted_games ?? []), [settings]);
-  const isSelected = useCallback((appId: number) => !blacklist.has(appId), [blacklist]);
-
-  const setSelected = useCallback(
-    (appIds: number[], selected: boolean) => {
-      const next = new Set(blacklist);
-      appIds.forEach((id) => (selected ? next.delete(id) : next.add(id)));
-      void updateSettings({ blacklisted_games: [...next] });
-    },
-    [blacklist, updateSettings]
-  );
-
-  /** Renames a game in Steam; the plan changes because Steam's id for a shortcut comes from its name. */
-  const renameGame = useCallback(async (game: ShortcutSummary, name: string) => {
-    await invoke("rename_game", { appId: game.app_id, original: game.app_name, name });
-    const displayName = name.trim() || game.app_name;
-    setPlatforms((prev) =>
-      prev.map((p) => ({
-        ...p,
-        games: p.games.map((g) => (g.app_id === game.app_id ? { ...g, display_name: displayName } : g)),
-      }))
-    );
-    setPlan(await invoke<SyncPlan>("plan_sync"));
-  }, []);
-
-  const runImport = useCallback(async () => {
-    setSyncing(true);
-    setSyncError(null);
-    setOutcome(null);
-    setProgress({ state: "starting" });
-    try {
-      setOutcome(await invoke<SyncOutcome>("run_full_sync"));
-      await fetchAll();
-    } catch (err) {
-      setSyncError(errorMessage(err));
-    } finally {
-      setSyncing(false);
+      await reload();
     }
-  }, [fetchAll]);
+    setImportOpen(true);
+  }, [library, reload, toast]);
 
-  const togglePlatform = useCallback(
-    async (codeName: string, enabled: boolean) => {
-      const previous = platforms;
-      setPlatforms((prev) => prev.map((p) => (p.code_name === codeName ? { ...p, enabled } : p)));
-      setPlatformBusy((prev) => withItem(prev, codeName, true));
-      try {
-        const response = await invoke<PlatformToggleResponse>("update_platform_enabled", { codeName, enabled });
-        setPlatforms(response.platforms);
-        setPlan(response.plan);
-      } catch (err) {
-        setLoadError(errorMessage(err));
-        setPlatforms(previous);
-      } finally {
-        setPlatformBusy((prev) => withItem(prev, codeName, false));
-      }
-    },
-    [platforms]
+  const ctx = useMemo<AppContextValue>(
+    () => ({
+      info,
+      prefs,
+      library,
+      go: setView,
+      reload,
+      savePrefs,
+      refresh,
+      scanning,
+      openAddGame: () => setAddOpen(true),
+      openImport: () => setImportOpen(true),
+      steamGames,
+      startSync,
+      art,
+      reloadArt,
+      fetchArt,
+      artProgress,
+      hasArtKey,
+    }),
+    [info, prefs, library, reload, savePrefs, refresh, scanning, steamGames, startSync, art, reloadArt, fetchArt, artProgress, hasArtKey]
   );
 
-  const openPlatformSettings = useCallback((codeName: string) => {
-    setFocusPlatform(codeName);
-    setView("settings");
-  }, []);
-
-  const changePlatformField = useCallback((codeName: string, update: PlatformFieldUpdate) => {
-    setPlatformGroups((prev) =>
-      prev.map((group) =>
-        group.codeName !== codeName
-          ? group
-          : {
-              ...group,
-              fields: group.fields.map((field) =>
-                field.key === update.key && field.kind === update.kind
-                  ? ({ ...field, value: update.value } as typeof field)
-                  : field
-              ),
-            }
-      )
-    );
-  }, []);
-
-  const resetPlatform = useCallback((codeName: string) => {
-    setPlatformGroups((prev) => prev.map((g) => (g.codeName === codeName ? resetGroup(g) : g)));
-  }, []);
-
-  const savePlatform = useCallback(
-    async (codeName: string) => {
-      const group = platformGroups.find((g) => g.codeName === codeName);
-      if (!group) return;
-      setPlatformError(null);
-      setPlatformSaving((prev) => withItem(prev, codeName, true));
-      try {
-        const payload = await invoke<PlatformSettingsPayload>("update_platform_settings", {
-          codeName,
-          settings: buildPlatformSettingsPayload(group),
-        });
-        const merged = mergeOptionalFieldKinds(buildPlatformSettingsGroup(payload), group);
-        setPlatformGroups((prev) => prev.map((g) => (g.codeName === codeName ? merged : g)));
-        await fetchAll();
-      } catch (err) {
-        setPlatformError(errorMessage(err));
-      } finally {
-        setPlatformSaving((prev) => withItem(prev, codeName, false));
-      }
-    },
-    [fetchAll, platformGroups]
-  );
-
-  const navStatus = useNavigation({
-    onBack: () => setView("games"),
-    onPrevView: () => setView((v) => VIEWS[Math.max(0, VIEWS.indexOf(v) - 1)]),
-    onNextView: () => setView((v) => VIEWS[Math.min(VIEWS.length - 1, VIEWS.indexOf(v) + 1)]),
-    // Y only moves to the Import button; A confirms, so a stray press never imports.
-    onImport: () => document.getElementById("import-button")?.focus(),
-  });
-
-  const plannedAppIds = useMemo(() => new Set(plan?.additions.map((a) => a.shortcut.app_id) ?? []), [plan]);
-  const selectedIn = useCallback((p: PlatformSummary) => p.games.filter((g) => isSelected(g.app_id)).length, [isSelected]);
-
-  if (loading) {
+  if (!info || !prefs) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-4">
-        <img src={logo} alt="" className="pixelated simmer h-24 w-24" />
-        <p className="font-pixel text-lg text-peach">Looking for your games…</p>
+        <img src={logo} alt="" className="h-16 w-16 animate-pulse" />
+        <p className="text-text-2">Starting BoilerSteamXL…</p>
       </div>
     );
   }
 
+  if (!prefs.first_run_complete) {
+    return (
+      <AppContext.Provider value={ctx}>
+        <FirstRun />
+      </AppContext.Provider>
+    );
+  }
+
   return (
-    <div className="flex h-full flex-col">
-      <header className="flex items-center gap-4 border-b-3 border-harbour bg-deep px-5 py-2">
-        <img src={logo} alt="" className="pixelated h-9 w-9" />
-        <span className="font-pixel text-2xl text-foam">BoilR</span>
-        <nav aria-label="Main" className="ml-6 flex gap-1">
-          {VIEWS.map((v) => (
-            <button
-              key={v}
-              type="button"
-              onClick={() => setView(v)}
-              aria-current={view === v ? "page" : undefined}
-              className={clsx(
-                "border-b-3 px-3 py-1.5 font-pixel text-lg transition-colors",
-                view === v ? "border-flame text-foam" : "border-transparent text-mauve hover:text-peach"
-              )}
-            >
-              {VIEW_LABELS[v]}
-            </button>
-          ))}
-        </nav>
-        <span className="ml-auto text-sm text-mauve" title={`Commit ${__BUILD_COMMIT__}, built ${__BUILD_TIME__}`}>
-          Version {__APP_VERSION__}
-        </span>
-        <button type="button" className="link-btn" onClick={rescan} disabled={rescanning || syncing}>
-          {rescanning ? "Looking…" : "Look for games again"}
-        </button>
-      </header>
-
-      {loadError ? (
-        <p role="alert" className="border-b-2 border-ember bg-harbour/60 px-5 py-2 text-peach">
-          Something went wrong: {loadError}
-        </p>
-      ) : null}
-
-      <main className="min-h-0 flex-1">
-        {view === "games" ? (
-          <div className="grid h-full grid-cols-[15rem_1fr]">
-            <aside className="min-h-0 border-r-3 border-harbour bg-deep/50">
-              <Sources platforms={platforms} selectedIds={selectedIn} filter={filter} onFilter={setFilter} />
-            </aside>
-            <div className="min-h-0">
-              <GameList
-                platforms={platforms}
-                filter={filter}
-                isSelected={isSelected}
-                plannedAppIds={plannedAppIds}
-                onToggleGame={(id, v) => setSelected([id], v)}
-                onRenameGame={renameGame}
-                onSetMany={setSelected}
-                onTogglePlatform={togglePlatform}
-                busyPlatforms={platformBusy}
-                onOpenSettings={openPlatformSettings}
-              />
+    <AppContext.Provider value={ctx}>
+      <div className="flex h-full">
+        <aside className="flex w-60 flex-none flex-col border-r border-line bg-bg-2">
+          <div className="flex items-center gap-2.5 px-5 pt-5 pb-4">
+            <img src={logo} alt="" className="h-8 w-8 rounded-lg" />
+            <div className="leading-tight">
+              <div className="font-display text-[15px] font-bold">
+                BoilerSteam<span className="gradient-text">XL</span>
+              </div>
+              <div className="text-[11px] text-text-3">v{info.version}</div>
             </div>
           </div>
-        ) : view === "artwork" ? (
-          <ArtworkView settings={settings} onSettingsChanged={setSettings} />
-        ) : view === "shortcuts" ? (
-          <ShortcutsView
-            onSettingsChanged={(s) => {
-              setSettings(s);
-              void invoke<SyncPlan>("plan_sync").then(setPlan);
-            }}
-          />
-        ) : (
-          <SettingsView
-            settings={settings}
-            onUpdate={updateSettings}
-            error={settingsError}
-            platformGroups={platformGroups}
-            platformLoading={platformLoading}
-            platformError={platformError}
-            platformSaving={platformSaving}
-            onFieldChange={changePlatformField}
-            onReset={resetPlatform}
-            onSavePlatform={savePlatform}
-            focusPlatform={focusPlatform}
-            navStatus={navStatus}
-          />
-        )}
-      </main>
+          <nav aria-label="Main" className="scroll-quiet flex-1 overflow-y-auto px-3 pb-3">
+            {[...NAV, ...(moreOpen || TOOLS.some((t) => t.view === view) ? TOOLS : [])].map((item, i) => (
+              <div key={item.view}>
+                {i === NAV.length ? <div className="label mt-4 mb-1.5 px-2.5">More tools</div> : null}
+                <button
+                  type="button"
+                  onClick={() => setView(item.view)}
+                  aria-current={view === item.view ? "page" : undefined}
+                  className={clsx(
+                    "group relative mb-0.5 flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-[13px] font-medium transition-colors",
+                    view === item.view ? "bg-surface-3 text-text" : "text-text-2 hover:bg-surface-2 hover:text-text"
+                  )}
+                >
+                  {view === item.view ? <span className="absolute top-2 bottom-2 left-0 w-[3px] rounded-full bg-accent" /> : null}
+                  <Icon name={item.icon} className={view === item.view ? "text-accent" : ""} />
+                  <span className="flex-1 text-left">{item.label}</span>
+                  {item.view === "review" && pending > 0 ? (
+                    <span className="rounded-full bg-accent px-1.5 text-[11px] font-bold text-white">{pending}</span>
+                  ) : null}
+                </button>
+              </div>
+            ))}
+            {!TOOLS.some((t) => t.view === view) ? (
+              <button type="button" className="mt-3 w-full px-2.5 text-left text-xs text-text-3 hover:text-text" onClick={() => setMoreOpen(!moreOpen)}>
+                {moreOpen ? "Hide more tools" : "More tools…"}
+              </button>
+            ) : null}
+          </nav>
+          <div className="space-y-2 border-t border-line p-3">
+            {info.simulation ? (
+              <button type="button" onClick={() => setView("settings")} className="flex w-full items-center gap-2 rounded-lg border border-warn/30 bg-warn/10 px-2.5 py-2 text-left text-xs text-warn">
+                <Icon name="shield" />
+                <span>
+                  <b>Simulation mode</b>
+                  <br />
+                  <span className="text-text-2">Steam is never modified</span>
+                </span>
+              </button>
+            ) : null}
+            <div className="flex items-center gap-2 px-1 text-xs text-text-3">
+              <span className={clsx("h-2 w-2 rounded-full", info.steam_running ? "bg-ok" : "bg-text-3")} />
+              Steam {info.steam_running ? "is running" : "is closed"}
+              {info.mode !== "installed" ? <span className="ml-auto">Portable</span> : null}
+            </div>
+          </div>
+        </aside>
 
-      <PipeBar
-        toAdd={plan?.additions.length ?? 0}
-        removals={plan?.removals ?? []}
-        syncing={syncing}
-        progress={progress}
-        outcome={outcome}
-        syncError={syncError}
-        restartsSteam={Boolean(settings?.steam?.start_steam)}
-        hasGames={platforms.some((p) => p.enabled && p.games.length > 0)}
-        padConnected={navStatus.pads.length > 0}
-        onImport={runImport}
-      />
-    </div>
+        <div className="flex min-w-0 flex-1 flex-col">
+          <header className="flex items-center gap-3 border-b border-line bg-bg/80 px-6 py-3 backdrop-blur">
+            {scanning ? (
+              <div className="flex min-w-0 flex-1 items-center gap-3">
+                <div className="h-1.5 w-40 overflow-hidden rounded-full bg-surface-3">
+                  <div className="progress-indeterminate h-full w-full" />
+                </div>
+                <span className="truncate text-xs text-text-2">
+                  {progress ? `${plural(progress.folders_scanned, "folder")} scanned · ${plural(progress.exes_found, "executable")} · ${progress.current}` : "Scanning your game folders…"}
+                </span>
+                <button type="button" className="btn-ghost btn-sm" onClick={() => void api.cancelRefresh()}>
+                  Cancel
+                </button>
+              </div>
+            ) : (
+              <div className="flex min-w-0 flex-1 items-center gap-2 text-xs text-text-3">
+                {library?.last_scan ? <>Last refresh {new Date(library.last_scan.at).toLocaleString()}</> : <>Not refreshed yet</>}
+                {artProgress ? (
+                  <span className="ml-3 flex items-center gap-2 text-text-2">
+                    <Icon name="artwork" className="animate-pulse text-accent" />
+                    Artwork {artProgress.done}/{artProgress.total} · {artProgress.current}
+                  </span>
+                ) : null}
+              </div>
+            )}
+            <button type="button" className="btn-ghost" onClick={() => setAddOpen(true)}>
+              <Icon name="plus" /> Add Game
+            </button>
+            <button type="button" className="btn-ghost" onClick={() => void refresh()} disabled={scanning}>
+              <Icon name="refresh" className={scanning ? "animate-spin" : ""} /> {scanning ? "Scanning…" : "Scan for games"}
+            </button>
+            <button type="button" className="btn-primary" onClick={() => void startSync()} disabled={scanning || changes === 0} title={changes ? undefined : "Nothing to change in Steam"}>
+              <Icon name="steam" /> Sync with Steam{changes ? ` (${changes})` : ""}
+            </button>
+          </header>
+
+          <main className="scroll-quiet min-h-0 flex-1 overflow-y-auto">
+            {view === "artwork" ? (
+              <ArtworkView settings={boilrSettings} />
+            ) : (
+              <div key={view} className="animate-in mx-auto max-w-[1500px] px-6 py-6">
+                {view === "dashboard" && <Dashboard lastSummary={summary} />}
+                {view === "games" && <Games />}
+                {view === "review" && <Review />}
+                {view === "discover" && <Discover />}
+                {view === "steam" && <SteamLibrary />}
+                {view === "rebuild" && <Rebuild />}
+                {view === "rules" && <Rules />}
+                {view === "automation" && <Automation />}
+                {view === "backups" && <Backups />}
+                {view === "settings" && <SettingsView onKeySaved={(s) => setBoilrSettings(s)} />}
+              </div>
+            )}
+          </main>
+        </div>
+      </div>
+      {addOpen ? <AddGame onClose={() => setAddOpen(false)} /> : null}
+      {importOpen ? <ImportDialog onClose={() => setImportOpen(false)} /> : null}
+    </AppContext.Provider>
   );
 };
+
+const App = () => (
+  <ToastProvider>
+    <Shell />
+  </ToastProvider>
+);
 
 export default App;

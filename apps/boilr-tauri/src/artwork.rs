@@ -11,8 +11,8 @@ use boilr::platforms::{get_platforms, platform_sections};
 use boilr_core::{
     settings::{save_settings, Settings},
     steam::{get_shortcuts_for_user, get_shortcuts_paths, SteamUsersInfo},
-    steamgriddb::{get_image_extension, get_query_type, CachedSearch, ImageType, ToDownload},
-    sync::{self, download_images, IsBoilRShortcut},
+    steamgriddb::{get_image_extension, get_query_type, CachedSearch, ImageType},
+    sync::{download_images, IsBoilRShortcut},
 };
 use serde::Serialize;
 use tauri::Manager;
@@ -40,6 +40,15 @@ fn kind(name: &str) -> Result<ImageType, String> {
 
 fn settings() -> Result<Settings, String> {
     Settings::new().map_err(|err| err.to_string())
+}
+
+/// Artwork changes write into Steam's userdata folder (and icons into shortcuts.vdf), so
+/// they follow BoilerSteamXL's Simulation mode like every other Steam write.
+fn ensure_steam_writes_allowed() -> Result<(), String> {
+    if bsxl_engine::prefs::Preferences::load().simulation_mode {
+        return Err("Simulation mode is on: artwork is not written to Steam. Turn it off in Settings → Safety.".into());
+    }
+    Ok(())
 }
 
 /// Runs a future to completion from a sync command. Tauri may run these on one of its runtime's
@@ -120,6 +129,7 @@ pub fn list_steam_accounts() -> Result<Vec<SteamAccount>, String> {
     let settings = settings()?;
     let mut accounts: Vec<SteamAccount> = users(&settings)?
         .iter()
+        .filter(|u| u.shortcut_path.is_some())
         .filter_map(|u| {
             let info = get_shortcuts_for_user(u).ok()?;
             Some(SteamAccount {
@@ -153,11 +163,15 @@ pub fn list_artwork<R: tauri::Runtime>(
     let user = user(&settings, &user_id)?;
     let folder = grid_folder(&user);
     // Let the web view load images from this account's artwork folder, and nothing else.
-    let _ = std::fs::create_dir_all(&folder);
-    app.asset_protocol_scope()
-        .allow_directory(&folder, false)
-        .map_err(|err| err.to_string())?;
-
+    // Browsing never creates folders in Steam's userdata.
+    if folder.is_dir() {
+        app.asset_protocol_scope()
+            .allow_directory(&folder, false)
+            .map_err(|err| err.to_string())?;
+    }
+    if user.shortcut_path.is_none() {
+        return Ok(Vec::new());
+    }
     let info = get_shortcuts_for_user(&user).map_err(|err| err.to_string())?;
     let mut games: Vec<ArtworkGame> = info
         .shortcuts
@@ -246,27 +260,33 @@ pub fn set_artwork(
     url: String,
     extension: String,
 ) -> Result<LocalImage, String> {
+    ensure_steam_writes_allowed()?;
     let settings = settings()?;
     let image_type = kind(&kind_name)?;
+    if matches!(image_type, ImageType::Icon | ImageType::BigPicture) {
+        ensure_steam_closed()?;
+    }
     if !EXTENSIONS.contains(&extension.as_str()) {
         return Err(format!("Unsupported image type: {extension}"));
     }
     if !url.starts_with("https://") {
         return Err("Images must come from an https address.".to_string());
     }
+    let _ = name;
     let folder = grid_folder(&user(&settings, &user_id)?);
     std::fs::create_dir_all(&folder).map_err(|err| err.to_string())?;
+    // Download first: the image the game has now is only replaced by one that arrived whole.
+    let bytes = block_on(async { crate::covers::fetch_bytes(&crate::covers::http()?, &url).await })??;
+    let target = folder.join(image_type.file_name(app_id, &extension));
+    let tmp = folder.join(format!("{}.bsxl-tmp", image_type.file_name(app_id, &extension)));
+    std::fs::write(&tmp, &bytes).map_err(|e| e.to_string())?;
     remove_images(&folder, app_id, &image_type);
-    let to_download = ToDownload {
-        path: folder.join(image_type.file_name(app_id, &extension)),
-        url,
-        app_name: name,
-        image_type,
-    };
-    block_on(boilr_core::steamgriddb::download_to_download(&to_download))?
-        .map_err(|e| e.to_string())?;
+    std::fs::rename(&tmp, &target).map_err(|e| {
+        let _ = std::fs::remove_file(&tmp);
+        e.to_string()
+    })?;
     if matches!(image_type, ImageType::Icon | ImageType::BigPicture) {
-        point_shortcuts_at_icons(&settings);
+        point_shortcuts_at_icons(&settings, Some((user_id.as_str(), app_id)))?;
     }
     current_image(&folder, app_id, &image_type)
         .ok_or_else(|| "The download produced no file.".to_string())
@@ -280,6 +300,7 @@ pub fn clear_artwork(
     kind_name: String,
     never_download: bool,
 ) -> Result<Settings, String> {
+    ensure_steam_writes_allowed()?;
     let mut settings = settings()?;
     let image_type = kind(&kind_name)?;
     remove_images(
@@ -366,19 +387,35 @@ pub fn set_artwork_game(app_id: u32, name: String, grid_id: usize) -> Result<(),
 /// Downloads artwork for every shortcut that is missing some, like the end of an import.
 #[tauri::command(async)]
 pub fn find_missing_artwork() -> Result<(), String> {
+    ensure_steam_writes_allowed()?;
+    ensure_steam_closed()?;
     let settings = settings()?;
     client(&settings)?;
-    let users = users(&settings)?;
+    // Only the accounts chosen in Settings ("Steam accounts to write to").
+    let prefs = bsxl_engine::prefs::Preferences::load();
+    let mut users = users(&settings)?;
+    users.retain(|u| prefs.target_users.is_empty() || prefs.target_users.contains(&u.user_id));
     block_on(download_images(&settings, &users, &mut None))?;
-    point_shortcuts_at_icons(&settings);
+    point_shortcuts_at_icons(&settings, None)?;
     Ok(())
 }
 
 /// Steam takes a shortcut's small icon from its `icon` field, not from the grid folder.
-fn point_shortcuts_at_icons(settings: &Settings) {
-    if let Err(err) = sync::fix_all_shortcut_icons(settings) {
-        eprintln!("Could not point shortcuts at their icons: {err}");
+/// That is a shortcuts.vdf write, so it goes through the engine's safeguards. `only` is the one
+/// shortcut whose icon was just chosen; without it, shortcuts missing an icon are filled.
+fn point_shortcuts_at_icons(settings: &Settings, only: Option<(&str, u32)>) -> Result<usize, String> {
+    use bsxl_engine::{import, prefs::Preferences, steam};
+    let prefs = Preferences::load();
+    let lock = import::wait_for_lock(std::time::Duration::from_secs(15))?;
+    let snap = steam::snapshot(&steam::detect_steam_path(prefs.steam_path.as_deref()));
+    import::point_icons_at_grid(&lock, &snap, &prefs, settings.steam.optimize_for_big_picture, only, &steam::is_steam_running)
+}
+
+fn ensure_steam_closed() -> Result<(), String> {
+    if bsxl_engine::steam::is_steam_running() {
+        return Err("Steam is running. Close Steam to change shortcut icons; BoilerSteamXL never force-closes it.".into());
     }
+    Ok(())
 }
 
 #[cfg(test)]

@@ -2,6 +2,7 @@ import clsx from "clsx";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 
+import { useApp } from "../App";
 import type { Settings } from "../settings";
 import type { ArtworkGame, ArtworkKind, ArtworkOption, GameMatch, SteamAccount } from "../types";
 import { errorMessage, initials, plural, tileColor, toImageSrc } from "../lib/format";
@@ -99,44 +100,15 @@ const Art = ({
 // ---------------------------------------------------------------------------------------------
 // No key yet
 
-const KeyOnboarding = ({ onSaved }: { onSaved: (s: Settings) => void }) => {
-  const [key, setKey] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const save = async () => {
-    try {
-      onSaved(
-        await invoke<Settings>("update_settings", {
-          update: { steamgrid_db: { auth_key: key.trim() } },
-        }),
-      );
-    } catch (err) {
-      setError(errorMessage(err));
-    }
-  };
+/** The key is set up in Settings only, where it is checked before it is saved. */
+const KeyOnboarding = () => {
+  const { go } = useApp();
   return (
     <div className="max-w-prose">
-      <p className="text-peach">
-        BoilR gets covers, banners and logos from SteamGridDB, a free community site. It needs a key to ask for them.
-      </p>
-      <ol className="mt-3 list-decimal space-y-1 pl-5 text-peach">
-        <li>Sign in at steamgriddb.com (a Steam login works).</li>
-        <li>Open Preferences, then API, and copy your key.</li>
-        <li>Paste it here.</li>
-      </ol>
-      <div className="mt-4 flex gap-2">
-        <input
-          type="password"
-          value={key}
-          onChange={(e) => setKey(e.target.value)}
-          placeholder="Paste your key"
-          aria-label="SteamGridDB key"
-          className="field max-w-sm flex-1"
-        />
-        <button type="button" className="btn-primary" disabled={!key.trim()} onClick={save}>
-          Save key
-        </button>
-      </div>
-      {error ? <p className="mt-2 text-ember">{error}</p> : null}
+      <p className="text-peach">Artwork comes from SteamGridDB, a free community site. It needs your free key, which you add in Settings.</p>
+      <button type="button" className="btn-primary mt-4" onClick={() => go("settings")}>
+        Add my key in Settings
+      </button>
     </div>
   );
 };
@@ -286,6 +258,9 @@ const GameDetail = ({
   onChanged: (game: ArtworkGame) => void;
 }) => {
   const [kind, setKind] = useState<ArtworkKind>("grid");
+  /** "Remove" deletes Steam's file: it takes a second click. */
+  const [confirmRemove, setConfirmRemove] = useState(false);
+  useEffect(() => setConfirmRemove(false), [kind, game.app_id]);
   const [options, setOptions] = useState<ArtworkOption[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -444,11 +419,12 @@ const GameDetail = ({
           <p className="max-w-prose text-mauve">{hint}</p>
           <div className="flex flex-wrap gap-4">
             {current ? (
-              <button type="button" className="link-btn" onClick={() => clear(false)}>
-                Remove
+              <button type="button" className="link-btn" onClick={() => (confirmRemove ? clear(false) : setConfirmRemove(true))}>
+                {confirmRemove ? "Click again to remove" : "Remove"}
               </button>
             ) : null}
-            {never ? null : (
+            {/* Only without an image: it never deletes one (that is "Remove"). */}
+            {never || current ? null : (
               <button type="button" className="link-btn" onClick={() => clear(true)}>
                 Never download this
               </button>
@@ -548,13 +524,7 @@ const GameDetail = ({
 // ---------------------------------------------------------------------------------------------
 // All games
 
-export const ArtworkView = ({
-  settings,
-  onSettingsChanged,
-}: {
-  settings: Settings | null;
-  onSettingsChanged: (settings: Settings) => void;
-}) => {
+export const ArtworkView = ({ settings }: { settings: Settings | null }) => {
   const hasKey = Boolean(settings?.steamgrid_db?.auth_key?.trim());
   const [accounts, setAccounts] = useState<SteamAccount[] | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
@@ -669,7 +639,7 @@ export const ArtworkView = ({
 
         <div className="mt-6">
           {!hasKey ? (
-            <KeyOnboarding onSaved={onSettingsChanged} />
+            <KeyOnboarding />
           ) : accounts && accounts.length === 0 ? (
             <p className="max-w-prose text-peach">
               No Steam shortcuts yet. Import some games first, then choose their artwork here.

@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#7c5cff"/>
+      <stop offset="1" stop-color="#18c8ff"/>
+    </linearGradient>
+    <linearGradient id="card" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#dfe7ff"/>
+    </linearGradient>
+  </defs>
+  <rect x="48" y="48" width="928" height="928" rx="220" fill="url(#bg)"/>
+  <rect x="48" y="48" width="928" height="928" rx="220" fill="#0b1020" opacity="0.18"/>
+  <!-- three game cases on a shelf -->
+  <rect x="236" y="250" width="150" height="430" rx="34" fill="#ffffff" opacity="0.55"/>
+  <rect x="414" y="210" width="150" height="470" rx="34" fill="#ffffff" opacity="0.78"/>
+  <rect x="592" y="290" width="196" height="390" rx="40" fill="url(#card)" transform="rotate(12 690 485)"/>
+  <rect x="210" y="712" width="604" height="56" rx="28" fill="#ffffff"/>
+  <!-- approval check -->
+  <circle cx="742" cy="742" r="150" fill="#0b1020"/>
+  <path d="M672 744 l48 48 l96 -104" fill="none" stroke="#3ef0a5" stroke-width="44" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

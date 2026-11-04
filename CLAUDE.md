@@ -1,4 +1,28 @@
-# BoilR
+# BoilerSteamXL (fork of BoilR)
+
+This repository is **BoilerSteamXL**, a Windows-first fork. Its additions live in
+`crates/bsxl-engine` (no UI, tested) and the Tauri app in `apps/boilr-tauri` (binary
+`BoilerSteamXL.exe`). Read `docs/ARCHITECTURE.md` and `PROGRESS.md` first.
+
+Rules that must hold:
+- Nothing writes to Steam except `bsxl_engine::import` (approval + confirmed plan token +
+  verified backup + Steam closed). Never expose BoilR's `run_full_sync` in the app.
+- Never run imports, rebuilds or restores against a real Steam installation while developing;
+  tests use synthetic fixtures (`crates/bsxl-engine/tests/common`).
+- Scans never modify Steam. Refresh never imports.
+
+Verify a change with (Windows, GNU toolchain: MinGW on PATH, `CARGO_TARGET_DIR` without spaces):
+
+```
+cargo test -p bsxl-engine
+cd apps/boilr-tauri && cargo test && npx tsc --noEmit -p . && npm run build
+```
+
+The UI can be checked in a browser with `npm run dev` (sample-data mock in `src/devMock.ts`).
+
+---
+
+# BoilR (upstream notes)
 
 Rust desktop app (egui/eframe) that finds games from other launchers (Epic, GOG, Heroic, Lutris, itch, Bottles, Xbox/Game Pass, ...) and writes them into Steam as non-Steam shortcuts, with artwork from SteamGridDB. Main users: Linux and Steam Deck (often via Flatpak), then Windows. Owner: Philip (@PhilipK).
 

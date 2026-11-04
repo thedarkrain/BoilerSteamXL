@@ -3,21 +3,28 @@
 [workspace]
 
 [package]
-name = "boilr-tauri"
-version = "2.0.0-beta.2"
+name = "boilersteamxl"
+version = "1.0.0"
+description = "BoilerSteamXL: discover, review and safely import non-Steam games (based on BoilR)"
 edition = "2021"
 
 [dependencies]
 boilr = { path = "../..", package = "boilr", default-features = false }
 boilr-core = { path = "../../crates/boilr-core" }
+bsxl-engine = { path = "../../crates/bsxl-engine" }
+reqwest = { version = "^0.12.9", default-features = false, features = ["json", "rustls-tls"] }
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.145"
 tauri = { version = "2.0.0", features = ["wry", "protocol-asset"] }
+tauri-plugin-dialog = "2"
 tokio = { version = "1.41.0", features = ["rt-multi-thread"] }
 steam_shortcuts_util = "1.1.9"
 steamgriddb_api = "0.3.1"
-time = "0.3"
+time = { version = "0.3", features = ["local-offset", "formatting"] }
 toml = "0.9.8"
+
+[target."cfg(windows)".dependencies]
+tauri-winrt-notification = "0.7"
 
 [build-dependencies]
 tauri-build = { version = "2.0.0", features = [] }
@@ -28,3 +35,8 @@ tauri = { version = "2.0.0", features = ["test", "wry"] }
 [features]
 # Launcher detection from inside the Flatpak sandbox (flatpak-spawn), as in the egui Flatpak.
 flatpak = ["boilr/flatpak"]
+
+[profile.release]
+lto = true
+codegen-units = 1
+strip = true

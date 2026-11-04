@@ -1,8 +1,9 @@
 {
   "$schema": "https://raw.githubusercontent.com/tauri-apps/tauri/v2/schema.json",
-  "productName": "BoilR",
-  "version": "2.0.0-beta.2",
-  "identifier": "io.github.philipk.boilr",
+  "productName": "BoilerSteamXL",
+  "mainBinaryName": "BoilerSteamXL",
+  "version": "1.0.0",
+  "identifier": "io.github.boilersteamxl",
   "build": {
     "beforeBuildCommand": "npm run build",
     "beforeDevCommand": "npm run dev",
@@ -14,13 +15,15 @@
     "windows": [
       {
         "label": "main",
-        "title": "BoilR",
-        "width": 1280,
-        "height": 800,
+        "title": "BoilerSteamXL",
+        "width": 1400,
+        "height": 880,
         "url": "index.html",
         "resizable": true,
-        "minWidth": 900,
-        "minHeight": 600
+        "minWidth": 1024,
+        "minHeight": 640,
+        "center": true,
+        "dragDropEnabled": true
       }
     ],
     "security": {
@@ -32,14 +35,22 @@
   },
   "bundle": {
     "active": true,
-    "targets": [
-      "appimage"
-    ],
-    "icon": [
-      "icons/icon.png",
-      "icons/icon.ico"
-    ],
+    "targets": ["nsis"],
+    "icon": ["icons/32x32.png", "icons/128x128.png", "icons/128x128@2x.png", "icons/icon.png", "icons/icon.ico"],
     "category": "Game",
-    "shortDescription": "Add games from other launchers to Steam"
+    "publisher": "BoilerSteamXL contributors",
+    "copyright": "BoilerSteamXL contributors; based on BoilR by Philip Kristoffersen (MIT/Apache-2.0)",
+    "shortDescription": "Discover, review and safely import non-Steam games",
+    "longDescription": "BoilerSteamXL finds the games on your PC, filters out installers and utilities, prevents duplicates and adds only the games you approve to Steam. Not affiliated with Valve or the BoilR project.",
+    "license": "MIT OR Apache-2.0",
+    "windows": {
+      "webviewInstallMode": { "type": "downloadBootstrapper", "silent": true },
+      "nsis": {
+        "installMode": "currentUser",
+        "displayLanguageSelector": false,
+        "installerIcon": "icons/icon.ico",
+        "installerHooks": "windows/hooks.nsh"
+      }
+    }
   }
 }
