@@ -67,6 +67,19 @@ Rescans keep your decisions: you only see what is new.
 
 <sub>Screenshots from the app's preview mode with sample games and real SteamGridDB artwork.</sub>
 
+### Before and after in Steam
+
+| Before: games added by hand, with `.exe` names and no artwork | After: real names and covers for every game, no duplicate |
+| :---: | :---: |
+| ![Steam library before BoilerSteamXL](docs/screenshots/steam-before.png) | ![Steam library after BoilerSteamXL](docs/screenshots/steam-after.png) |
+
+<sub>Illustrations of a Steam library, not real Steam screenshots, with sample games and real
+SteamGridDB covers. **Sync with Steam** adds the games that aren't in Steam yet (ADDED) and merges the
+duplicate. **Clean Rebuild** (under More tools, mode *Rebuild All Non-Steam Games*) swaps the grey
+hand-added shortcuts for named ones with artwork (FIXED), after a backup and a typed confirmation.
+Shortcuts that already had artwork (Baldur's Gate 3, Ghost of Tsushima, Red Dead Redemption 2,
+Split Fiction) were set to Keep, so they stay as they were.</sub>
+
 ## Features
 
 - 🎮 **One list, one button.** Every game on this PC and every non-Steam shortcut in Steam.
