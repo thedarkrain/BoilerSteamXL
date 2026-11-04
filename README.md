@@ -9,6 +9,25 @@
   Point it at <code>D:\Games</code>, check the list, press <b>Sync with Steam</b>. Done.
 </p>
 
+<h2 align="center">Before and after in Steam</h2>
+
+<p align="center"><b>Before:</b> games added by hand, with <code>.exe</code> names and no artwork</p>
+<p align="center">
+  <img src="docs/screenshots/steam-before.png" width="100%" alt="Steam library before BoilerSteamXL: grey tiles named after .exe files and a duplicate">
+</p>
+
+<p align="center"><b>After:</b> real names and covers for every game, no duplicate</p>
+<p align="center">
+  <img src="docs/screenshots/steam-after.png" width="100%" alt="Steam library after BoilerSteamXL: every game with its real name and cover">
+</p>
+
+<p align="center"><sub>Illustrations of a Steam library, not real Steam screenshots, with sample games and real
+SteamGridDB covers. <b>Sync with Steam</b> adds the games that aren't in Steam yet (ADDED) and merges the
+duplicate. <b>Clean Rebuild</b> (under More tools, mode <i>Rebuild All Non-Steam Games</i>) swaps the grey
+hand-added shortcuts for named ones with artwork (FIXED), after a backup and a typed confirmation.
+Shortcuts that already had artwork (Baldur's Gate 3, Ghost of Tsushima, Red Dead Redemption 2,
+Split Fiction) were set to Keep, so they stay as they were.</sub></p>
+
 <p align="center">
   <a href="https://github.com/thedarkrain/BoilerSteamXL/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/thedarkrain/BoilerSteamXL?style=for-the-badge&color=7c5cff"></a>
   <a href="https://github.com/thedarkrain/BoilerSteamXL/releases"><img alt="Downloads" src="https://img.shields.io/github/downloads/thedarkrain/BoilerSteamXL/total?style=for-the-badge&color=22c55e"></a>
@@ -66,19 +85,6 @@ Rescans keep your decisions: you only see what is new.
 | ![Merge duplicates](docs/screenshots/merge.png) | ![Sync with Steam](docs/screenshots/sync.png) |
 
 <sub>Screenshots from the app's preview mode with sample games and real SteamGridDB artwork.</sub>
-
-### Before and after in Steam
-
-| Before: games added by hand, with `.exe` names and no artwork | After: real names and covers for every game, no duplicate |
-| :---: | :---: |
-| ![Steam library before BoilerSteamXL](docs/screenshots/steam-before.png) | ![Steam library after BoilerSteamXL](docs/screenshots/steam-after.png) |
-
-<sub>Illustrations of a Steam library, not real Steam screenshots, with sample games and real
-SteamGridDB covers. **Sync with Steam** adds the games that aren't in Steam yet (ADDED) and merges the
-duplicate. **Clean Rebuild** (under More tools, mode *Rebuild All Non-Steam Games*) swaps the grey
-hand-added shortcuts for named ones with artwork (FIXED), after a backup and a typed confirmation.
-Shortcuts that already had artwork (Baldur's Gate 3, Ghost of Tsushima, Red Dead Redemption 2,
-Split Fiction) were set to Keep, so they stay as they were.</sub>
 
 ## Features
 
