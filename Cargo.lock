@@ -711,7 +711,7 @@ dependencies = [
  "image",
  "is_executable",
  "nom 8.0.0",
- "roxmltree 0.21.1",
+ "roxmltree 0.21.2",
  "serde",
  "serde_json",
  "sqlite",
@@ -4328,9 +4328,9 @@ checksum = "3cd14fd5e3b777a7422cca79358c57a8f6e3a703d9ac187448d0daf220c2407f"
 
 [[package]]
 name = "roxmltree"
-version = "0.21.1"
+version = "0.21.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f1964b10c76125c36f8afe190065a4bf9a87bf324842c05701330bba9f1cacbb"
+checksum = "9da7f59328b09405b181fee1018925fad50f157afb43c0c0f5c522c256dd5907"
 dependencies = [
  "memchr",
 ]
